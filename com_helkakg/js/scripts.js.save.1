@@ -1,0 +1,175 @@
+var path = getPath();
+var loadimg = "<img src='"+path+"images/loading.gif' class='helkakg_loadimg'>";
+var ie_fix = new Date().getTime();
+
+function getXmlHttp() {
+	ie_fix = new Date().getTime(); //update ie_fix
+
+	if (window.XMLHttpRequest) {
+		// code for IE7+, Firefox, Chrome, Opera, Safari
+		return new XMLHttpRequest();
+	}
+	else {
+		// code for IE6, IE5
+		return new ActiveXObject("Microsoft.XMLHTTP");
+	}
+}
+
+function displayObject(objectid) {
+	var xmlhttp = getXmlHttp();
+
+	xmlhttp.onreadystatechange=function() {
+		if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+			document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+		}
+	}
+	var fullpath = path+"php/action.php?action=displayObject";
+	if (objectid !== null) fullpath += "&objectid="+objectid;
+	fullpath += "&iefix="+ie_fix;
+	xmlhttp.open("GET",fullpath,true);
+	xmlhttp.send();
+}
+
+function newFolder(parentid) {
+	var xmlhttp = getXmlHttp();
+
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=newFolder&parentid="+parentid+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function uploadImage(parentid) {
+	var xmlhttp = getXmlHttp();
+
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=uploadImage&parentid="+parentid+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function editObject(objectid) {
+	var xmlhttp = getXmlHttp();
+
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=edit&objectid="+objectid+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function deleteObject(objectid) {
+	var xmlhttp = getXmlHttp();
+
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=delete&objectid="+objectid+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function displayHelp() {
+	var xmlhttp = getXmlHttp();
+
+	xmlhttp.onreadystatechange=function() {
+		if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+			document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+		}
+	}
+	xmlhttp.open("GET",path+"php/action.php?action=displayHelp&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function newFolderHandle() {
+	var helkakg_title = document.getElementById('helkakg_title').value;
+	var helkakg_description = document.getElementById('helkakg_description').value;
+	var helkakg_parent = document.getElementById('helkakg_parent').value;
+
+	document.getElementById("helkakg").innerHTML="Luodaan uutta kansiota... "+loadimg;
+
+	var xmlhttp = getXmlHttp();
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("POST",path+"php/action.php",true);
+	xmlhttp.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+
+	var headers = "helkakg_title="+helkakg_title;
+	headers += "&helkakg_description="+helkakg_description;
+	headers += "&action=newFolderHandle";
+	headers += "&helkakg_parent="+helkakg_parent;
+	xmlhttp.send(headers);
+}
+
+function editHandle(objectid) {
+	var helkakg_title = document.getElementById('helkakg_title').value;
+	var helkakg_description = document.getElementById('helkakg_description').value;
+	if (objectid != 1) var helkakg_parent = document.getElementById('helkakg_parent').value;
+
+	document.getElementById("helkakg").innerHTML="Tallennetaan muokkauksia... "+loadimg;
+
+	var xmlhttp = getXmlHttp();
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+		else document.getElementById("helkakg").innerHTML=xmlhttp.readyState+", "+xmlhttp.status;
+        }
+
+	xmlhttp.open("POST",path+"php/action.php",true);
+	xmlhttp.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+
+	var headers = "helkakg_title="+helkakg_title;
+	headers += "&helkakg_description="+helkakg_description;
+	headers += "&objectid="+objectid;
+	headers += "&action=editHandle";
+	if (objectid != 1) headers += "&helkakg_parent="+helkakg_parent;
+	xmlhttp.send(headers);
+}
+
+function deleteHandle(objectid) {
+	document.getElementById("helkakg").innerHTML="Poistetaan... "+loadimg;
+
+	var xmlhttp = getXmlHttp();
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=deleteHandle&objectid="+objectid+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function editOrdering(objectid, type) {
+	var xmlhttp = getXmlHttp();
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=editOrdering&objectid="+objectid+"&type="+type+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function uploadImages(parentid) {
+	var hiddeniframe = document.getElementById('hidden_upload');
+
+	if (hiddeniframe.attachEvent) hiddeniframe.attachEvent("onload", displayObject);
+	else if (hiddeniframe.addEventListener) hiddeniframe.addEventListener("load", displayObject, false)
+
+	document.getElementById('helkakg_submit').value="Ladataan kuvia...";
+	document.getElementById('helkakg_submit').disabled=true;
+	document.getElementById('helkakg_loadimgdiv').innerHTML=loadimg;
+}

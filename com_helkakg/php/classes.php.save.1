@@ -1,0 +1,793 @@
+<?php
+
+//no direct access
+defined( '_JEXEC' ) or die( 'Restricted access' );
+
+if (!defined("HELKAKG_PATH")) {
+	$path = dirname($_SERVER['PHP_SELF']);
+	$position = strrpos($path,'/') + 1;
+	$path = substr($path, 0, $position);
+	define("HELKAKG_PATH", $path);
+}
+class HelkaKGGUI {
+	// This is the GUI: it displays the folder browser, image viewer,
+	// edit- and create -pages, warnings, errors, etc.
+
+	public $folder;
+	public $system;
+
+	public function __construct() {
+		if (!empty($_COOKIE['helkakg_folder'])) $this->folder = $_COOKIE['helkakg_folder'];
+		else $this->folder = 1;
+		$this->system = new HelkaKGSystem();
+	}
+
+	public function displayObject($objectid=0) {
+		if ($objectid < 1) {
+			if (isset($_COOKIE['helkakg_folder'])) $objectid = $_COOKIE['helkakg_folder'];
+			else $objectid = 1;
+		}
+
+		$object = new HelkaKGObject($objectid);
+
+		if ($object->type == "img") $this->displayReturnIcon();
+		else {
+			$this->folder = $objectid;
+			setcookie("helkakg_folder", $objectid);
+			$_COOKIE['helkakg_folder'] = $objectid;
+		}
+
+		echo '<div class="helkakg_header"><h2>'.$object->title.'</h2>';
+
+		$this->displayAdminLinks($objectid);
+
+		echo '</div>';
+
+		// if viewing image, echo img-tag
+		if ($object->type == "img") {
+			echo '<img class="helkakg_bigimage" src="'.$object->getPath().'">';
+			$this->displayArrows($objectid);
+		}
+
+		if ($object->description) echo '<div class="helkakg_description">'.$this->formatDescription($object->description).'</div>';
+
+
+		//if viewing folder, display contents
+		if ($object->type == "dir") {
+			if ($objectid != 1) $this->displayThumbnail($object->parent);
+			$children = $object->getChildren();
+			foreach ($children as $childid) $this->displayThumbnail($childid);
+		}
+	}
+
+	public function displayThumbnail($objectid) {
+		$object = new HelkaKGObject($objectid);
+
+		echo '<div class="helkakg_thumbnail">';
+		if ($object->type == "dir") echo '<img src="'.HELKAKG_PATH.'images'.DS.'directory.png" class="helkakg_thumbnailpic" onclick="displayObject('.$objectid.');">';
+		else echo '<img src="'.$object->getPath(true).'" class="helkakg_thumbnailpic" onclick="displayObject('.$objectid.');">';
+		echo '<h3>'.$this->shortTitle($object->title).'</h3>';
+		if ($this->system->userIsAdmin()) {
+			if ($objectid != 1) echo '<img src="'.HELKAKG_PATH.'images'.DS.'delete.png" class="helkakg_smallicon" onclick="deleteObject('.$objectid.');">';
+			echo '<img src="'.HELKAKG_PATH.'images'.DS.'edit.png" class="helkakg_smallicon" onclick="editObject('.$objectid.');">';
+			if ($this->folder == $object->parent) { // Display ordering arrows
+				if ($object->previousObject()) echo '
+					<img src="'.HELKAKG_PATH.'images'.DS.'first.png" class="helkakg_smallicon" onclick="editOrdering('.$objectid.', \'first\');">
+					<img src="'.HELKAKG_PATH.'images'.DS.'previous.png" class="helkakg_smallicon" onclick="editOrdering('.$objectid.', '.$object->previousObject().');">
+				';
+				if ($object->nextObject()) echo '
+					<img src="'.HELKAKG_PATH.'images'.DS.'next.png" class="helkakg_smallicon" onclick="editOrdering('.$objectid.', '.$object->nextObject().');">
+					<img src="'.HELKAKG_PATH.'images'.DS.'last.png" class="helkakg_smallicon" onclick="editOrdering('.$objectid.', \'last\');">
+				';
+			}
+		}
+		echo '</div>';
+	}
+
+	public function displayAdminLinks($objectid) {
+		if (!$this->system->userIsAdmin()) return false;
+		$object = new HelkaKGObject($objectid);
+
+		echo '<div class="helkakg_adminlinks">';
+
+		// For directories (upload&newdir)
+		if ($object->type == "dir") echo '
+			<div class="helkakg_smalliconcontainer" onclick="uploadImage('.$objectid.');"><img src="'.HELKAKG_PATH.'images'.DS.'upload.png" class="helkakg_smallicon"><br>Lataa kuvia</div>
+			<div class="helkakg_smalliconcontainer" onclick="newFolder('.$objectid.');"><img src="'.HELKAKG_PATH.'images'.DS.'createdir.png" class="helkakg_smallicon"><br>Uusi kansio</div>
+		';
+
+		echo '<div class="helkakg_smalliconcontainer" onclick="editObject('.$objectid.');"><img src="'.HELKAKG_PATH.'images'.DS.'edit.png" class="helkakg_smallicon"><br>Muokkaa</div>';
+
+		if ($objectid != 1) echo '<div class="helkakg_smalliconcontainer" onclick="deleteObject('.$objectid.');"><img src="'.HELKAKG_PATH.'images'.DS.'delete.png" class="helkakg_smallicon"><br>Poista</div>';
+
+		echo '<div class="helkakg_smalliconcontainer" onclick="displayHelp();"><img src="'.HELKAKG_PATH.'images'.DS.'help.png" class="helkakg_smallicon"><br>Ohjeita</div>';
+
+		echo '</div>';
+	}
+
+	public function displayReturnIcon() {
+		echo '<div class="helkakg_return" onclick="displayObject();"><img src="'.HELKAKG_PATH.'images'.DS.'return.png" class="helkakg_biggericon"><br>Takaisin</div>';
+	}
+
+	public function displayArrows($objectid) {
+		$object = new HelkaKGObject($objectid);
+		$previous = $object->previousObject();
+		$next = $object->nextObject();
+		if (!$previous && !$next) return;
+		echo '<div>';
+		if ($previous) echo '<img src="'.HELKAKG_PATH.'images'.DS.'previous.png" onclick="displayObject('.$previous.')" class="helkakg_previous">';
+		if ($next) echo '<img src="'.HELKAKG_PATH.'images'.DS.'next.png" onclick="displayObject('.$next.')" class="helkakg_next">';
+		echo '</div>';
+	}
+
+	public function displayEditForm($mode="edit", $parentid=1, $title="", $description="", $objectid="") {
+		if (!$this->system->userIsAdmin()) return false;
+
+		$this->displayReturnIcon();
+
+		echo '
+		<table>
+			<tr>
+				<td>Otsikko:</td>
+				<td><input type="text" id="helkakg_title" name="helkakg_title" value="'.$title.'" maxlength="100"></td>
+			</tr>
+			<tr>
+				<td>Kuvaus:</td>
+				<td><textarea id="helkakg_description" name="helkakg_description" maxlength="255">'.$description.'</textarea></td>
+			</tr>
+		';
+
+		//display dropdown-selector for parent
+		if ($mode != "root") { // root folder's parent can't be changed
+			echo '
+			<tr>
+				<td>Kansio:</td>
+				<td>
+					<select id="helkakg_parent" name="helkakg_parent">
+			';
+			$this->displayOptionsForAllChildren(1, $parentid); //echo all folders as options
+			echo '
+					</select>
+				</td>
+			</tr>
+			';
+		}
+		else echo '<input type="hidden" id="helkakg_parent" name="helkakg_parent" value="0">';
+		echo '
+			<tr>
+				<td></td>
+				<td><input type="button" id="helkakg_submit" value="Tallenna" onclick="';
+		switch ($mode) {
+			case 'root':
+			case 'edit': echo 'editHandle('.$objectid.');'; break;
+			case 'newdir': echo 'newFolderHandle('.$parentid.');'; break;
+		}
+		echo '"></td>
+			</tr>
+		</table>
+		';
+	}
+
+	public function displayUploadImage($parentid=1) {
+		if (!$this->system->userIsAdmin()) return false;
+
+		echo '<div class="helkakg_header"><h2>Lisää kuvia</h2>';
+
+		$this->displayReturnIcon();
+
+		echo '</div><div class="helkakg_description">Sallitut tiedostotyypit: png, gif, jpg/jpeg.</div>';
+
+		echo '
+			<iframe name="hidden_upload" id="hidden_upload" src="" style="width:0;height:0;border:0px solid #fff;"></iframe>
+			<form action="'.HELKAKG_PATH.'php'.DS.'action.php" method="post" enctype="multipart/form-data" target="hidden_upload" onsubmit="uploadImages(1);">
+			<input name="action" type="hidden" value="uploadImageHandle">
+			<input type="hidden" name="MAX_FILE_SIZE" value="10485760">
+			<div id="helkakg_uploader">
+			<table>
+		';
+		for ($i=1; $i<11; $i++)	echo '
+			<tr>
+				<td>Kuva '.$i.'</td>
+				<td><input type="file" name="helkakg_image'.$i.'"></td>
+			</tr>
+		';
+
+		echo '
+			<tr>
+                                <td>Kansio:</td>
+                                <td>
+                                        <select id="helkakg_parent" name="helkakg_parent">
+                ';
+                $this->displayOptionsForAllChildren(1, $parentid); //echo all folders as options
+                echo '
+                                        </select>
+                                </td>
+                        </tr>
+			<tr>
+				<td></td>
+				<td><input type="submit" id="helkakg_submit" name="helkakg_submit" value="Lataa kuvat"><div id="helkakg_loadimgdiv"></div></td>
+			</tr>
+		</table>
+		</div>
+		</form>
+                ';
+
+	}
+
+	public function displayNewFolder($parentid=1) {
+		if (!$this->system->userIsAdmin()) return false;
+
+		echo '<div class="helkakg_header"><h2>Luo uusi kansio</h2></div>';
+		$this->displayEditForm('newdir', $parentid);
+	}
+
+	public function displayHelp() {
+		if (!$this->system->userIsAdmin()) return false;
+
+		echo '<div class="helkakg_header"><h2>Ohjeet</h2></div>';
+
+		$this->displayReturnIcon();
+
+		echo '
+			<h3>Kuvat</h3>
+			<div>
+				<h4>Kuvien lisääminen galleriaan</h4>
+				<ol>
+					<li>Klikkaa <img src="'.HELKAKG_PATH.'images'.DS.'upload.png" class="helkakg_help">-kuvaketta.</li>
+					<li>Valitse enintään 10 kuvaa tietokoneeltasi.</li>
+					<li>Valitse kansio, johon haluat ladata kuvat.</li>
+					<li>Klikkaa "Lataa kuvat"-nappia. Kuvien latauksessa voi kestää useita minuutteja, joten ole kärsivällinen!</li>
+				</ol>
+			</div>
+			<div>
+				<h4>Otsikon ja kuvauksen lisääminen kuvaan</h4>
+				<ol>
+					<li>Etsi kuvagalleriasta haluamasi kuva ja klikkaa sitä, jolloin pääset katsomaan kuvaa suurempana.</li>
+					<li>Klikkaa <img src="'.HELKAKG_PATH.'images'.DS.'edit.png" class="helkakg_help">-kuvaketta.</li>
+					<li>Valitse kuvalle nimi ja kuvaus. Voit halutessasi jättää kumman tahansa tyhjäksi.</li>
+					<li>Klikkaa "Tallenna"-nappia.</li>
+				</ol>
+			</div>
+			<div>
+				<h4>Kuvan siirtäminen toiseen kansioon</h4>
+				<ol>
+					<li>Etsi kuvagalleriasta haluamasi kuva ja klikkaa sitä, jolloin pääset katsomaan kuvaa suurempana.</li>
+					<li>Klikkaa <img src="'.HELKAKG_PATH.'images'.DS.'edit.png" class="helkakg_help">-kuvaketta.</li>
+					<li>Valitse kansio, johon haluat siirtää kuvan.</li>
+					<li>Klikkaa "Tallenna"-nappia.</li>
+				</ol>
+			</div>
+			<div>
+				<h4>Kuvien järjestyksen muuttaminen</h4>
+				<ol>
+					<li>Siirry tarkastelemaan kansiota, jonka kuvia haluat järjestellä.</li>
+					<li>Jos kansiossa on useampi kuin yksi kuva, kuvien alla näkyvät kuvakkeet <img src="'.HELKAKG_PATH.'images'.DS.'first.png" class="helkakg_help"><img src="'.HELKAKG_PATH.'images'.DS.'previous.png" class="helkakg_help"><img src="'.HELKAKG_PATH.'images'.DS.'next.png" class="helkakg_help"><img src="'.HELKAKG_PATH.'images'.DS.'last.png" class="helkakg_help">.</li>
+					<li>Näitä kuvakkeita klikkailemalla voit siirtää kuvan kansion ensimmäiseksi, yhden askeleen taaksepäin, yhden askeleen eteenpäin tai kansion viimeiseksi.</li>
+					<li>Mitään erillistä tallentamista ei tarvita; uusi järjestys tallentuu sitä mukaa kun siirtelet kuvia.</li>
+				</ol>
+			</div>
+			<div>
+				<h4>Kuvan poistaminen</h4>
+				<ol>
+					<li>Etsi kuvagalleriasta haluamasi kuva ja klikkaa sitä, jolloin pääset katsomaan kuvaa suurempana.</li>
+					<li>Klikkaa <img src="'.HELKAKG_PATH.'images'.DS.'delete.png" class="helkakg_help">-kuvaketta.</li>
+					<li>Galleria kysyy, haluatko varmasti poistaa kuvan. Jos olet varma poistosta, voit poistaa sen klikkaamalla samaa poistokuvaketta uudestaan. Muussa tapauksessa paina <img src="'.HELKAKG_PATH.'images'.DS.'return.png" class="helkakg_help">-kuvaketta.</li>
+				</ol>
+			</div>
+
+			<h3>Kansiot</h3>
+			<div>
+				<h4>Kansion lisääminen galleriaan</h4>
+				<ol>
+					<li>Klikkaa <img src="'.HELKAKG_PATH.'images'.DS.'createdir.png" class="helkakg_help">-kuvaketta.</li>
+					<li>Valitse kansiolle nimi ja kuvaus. Kuvaus ei ole pakollinen.</li>
+					<li>Valitse kansio, johon haluat luoda uuden kansion.</li>
+					<li>Klikkaa "Tallenna"-nappia.</li>
+				</ol>
+			</div>
+			<div>
+				<h4>Kansion nimen ja kuvauksen muokkaaminen</h4>
+				<ol>
+					<li>Siirry tarkastelemaan kansiota, jota haluat muokata.</li>
+					<li>Klikkaa <img src="'.HELKAKG_PATH.'images'.DS.'edit.png" class="helkakg_help">-kuvaketta.</li>
+					<li>Valitse kansiolle haluamasi nimi ja kuvaus. Kuvaus ei ole pakollinen.</li>
+					<li>Klikkaa "Tallenna"-nappia.</li>
+				</ol>
+			</div>
+			<div>
+				<h4>Kansion siirtäminen toiseen kansioon</h4>
+				<ol>
+					<li>Siirry tarkastelemaan kansiota, jonka haluat siirtää.</li>
+					<li>Klikkaa <img src="'.HELKAKG_PATH.'images'.DS.'edit.png" class="helkakg_help">-kuvaketta.</li>
+					<li>Valitse, mihin kansioon haluat siirtää kansion.</li>
+					<li>Klikkaa "Tallenna"-nappia.</li>
+				</ol>
+			</div>
+			<div>
+				<h4>Kansion nimen ja kuvauksen muokkaaminen</h4>
+				<ol>
+					<li>Siirry tarkastelemaan kansiota, jota haluat muokata.</li>
+					<li>Klikkaa <img src="'.HELKAKG_PATH.'images'.DS.'edit.png" class="helkakg_help">-kuvaketta.</li>
+					<li>Valitse kansiolle haluamasi nimi ja kuvaus. Kuvaus ei ole pakollinen.</li>
+					<li>Klikkaa "Tallenna"-nappia.</li>
+				</ol>
+			</div>
+			<div>
+				<h4>Kansion poistaminen</h4>
+				<ol>
+					<li>HUOM! Jos poistat kansion, kaikki sen sisältämät kuvat ja kansiot poistuvat samalla.</li>
+					<li>Siirry tarkastelemaan kansiota, jonka haluat poistaa.</li>
+					<li>Klikkaa <img src="'.HELKAKG_PATH.'images'.DS.'delete.png" class="helkakg_help">-kuvaketta.</li>
+					<li>Galleria kysyy, haluatko varmasti poistaa kansion JA SAMALLA KAIKKI SEN SISÄLTÄMÄT KANSIOT JA KUVAT. Jos olet varma poistosta, voit poistaa sen klikkaamalla samaa poistokuvaketta uudestaan. Muussa tapauksessa paina <img src="'.HELKAKG_PATH.'images'.DS.'return.png" class="helkakg_help">-kuvaketta.</li>
+				</ol>
+			</div>
+
+		';
+	}
+
+	public function displayEditPage($objectid) {
+		if (!$this->system->userIsAdmin()) return false;
+
+		echo '<div class="helkakg_header"><h2>Muokkaa</h2></div>';
+
+		$object = new HelkaKGObject($objectid);
+
+		if ($objectid == 1) $mode = 'root';
+		else $mode = 'edit';
+
+		$this->displayEditForm($mode, $object->parent, $object->title, $object->description, $objectid);
+	}
+
+	public function displayError($error) {
+		$this->displayReturnIcon();
+		echo '<div class="helkakg_error">'.$error.'</div>';
+	}
+
+	public function displayOptionsForAllChildren($folderid, $selectedFolder) {
+		// This function displays recursively all children of $folderid as <option> tags.
+		$folder = new HelkaKGObject($folderid);
+
+		if ($folder->type == "img") return false;
+
+		$children = $folder->getChildren();
+
+		//echo itself
+		echo '<option value="'.$folderid.'"';
+		if ($folderid == $selectedFolder) echo ' selected';
+		echo '>';
+
+		//display folder structure by echoing as many spaces as there are parents
+		for ($i=0; $i < $this->system->howManyParents($folderid); $i++) echo '- ';
+
+		echo $folder->title.'</option>';
+
+		//echo all children
+		foreach ($children as $childid) {
+			$this->displayOptionsForAllChildren($childid, $selectedFolder);
+		}
+	}
+
+	public function shortTitle($title) {
+		$maxlength = 43;
+		if (strlen($title) < $maxlength) return $title;
+		return substr($title, 0, $maxlength-2)."...";
+	}
+	public function formatDescription($description) {
+		return $this->makeClickableLinks($description);
+	}
+
+/*	public function makeClickableLinks($s) {
+		return preg_replace('@(https?://([-\w\.]+[-\w])+(:\d+)?(/([\w/_\.#-]*(\?\S+)?[^\.\s])?)?)@', '<a href="$1" target="_blank">$1</a>', $s);
+	}
+*/	public function makeClickableLinks($text) {
+		$text = preg_replace('#(script|about|applet|activex|chrome):#is', "\\1:", $text);
+
+		$ret = ' ' . $text;
+
+		// Replace Links with http://
+		$ret = preg_replace("#(^|[\n ])([\w]+?://[\w\#$%&~/.\-;:=,?@\[\]+]*)#is", "\\1<a href=\"\\2\" target=\"_blank\" rel=\"nofollow\">\\2</a>", $ret);
+
+		// Replace Links without http://
+		$ret = preg_replace("#(^|[\n ])((www|ftp)\.[\w\#$%&~/.\-;:=,?@\[\]+]*)#is", "\\1<a href=\"http://\\2\" target=\"_blank\" rel=\"nofollow\">\\2</a>", $ret);
+
+		// Replace Email Addresses
+		$ret = preg_replace("#(^|[\n ])([a-z0-9&\-_.]+?)@([\w\-]+\.([\w\-\.]+\.)*[\w]+)#i", "\\1<a href=\"mailto:\\2@\\3\">\\2@\\3</a>", $ret);
+		$ret = substr($ret, 1);
+
+		return $ret;
+	}
+}
+
+class HelkaKGSystem {
+	// Contains functions for updating, adding and deleting images and folders
+
+	public $errormessage;
+
+	public function createObject($title, $description, $parent, $uploadedFile="") {
+		if (!$this->userIsAdmin()) return false;
+
+		$objectid = $this->getNextObjectId();
+		$ordering = $this->getNextOrdering();
+
+		if ($uploadedFile!="") $type="img";
+		else $type="dir";
+
+
+		if ($type == "img") {
+			$fileExtension = strtolower(array_pop(explode(".", $uploadedFile['name'])));
+			$allowedExtensions = array("jpg", "jpeg", "png", "gif");
+			if (!in_array($fileExtension, $allowedExtensions)) return false;
+			if ($uploadedFile['size'] > 10485760) return false;
+		}
+		else $fileExtension = "";
+
+		if (!$this->objectInfoIsOk($objectid, $title, $parent, $fileExtension)) return false;
+
+		$fileName = $this->createFileName($objectid, $title, $parent, $fileExtension);
+
+		// Create database entry
+		$db =& JFactory::getDBO();
+		$updatableObject = new UpdatableObject($objectid, $parent, $fileName, $title, $description, $type, $ordering);
+		$db->insertObject('#__helkakg', $updatableObject);
+
+		$object = new HelkaKGObject($objectid);
+
+		if ($object->type == "img") {
+			move_uploaded_file($uploadedFile['tmp_name'], $object->getPath(false, true));
+			$this->createThumbnail($objectid);
+		}
+		else {
+			mkdir($object->getPath(false, true));
+		}
+
+		return true;
+	}
+
+	public function updateObject($objectid, $title, $description, $parent=0) {
+		if (!$this->userIsAdmin()) return false;
+
+		$object = new HelkaKGObject($objectid);
+		if ($objectid != 1) $newParent = new HelkaKGObject($parent);
+		else $parent = 0;
+		if ($object->type == "img") $fileExtension = array_pop(explode(".", $object->filename));
+		else $fileExtension = "";
+
+		$newFileName = $this->createFileName($objectid, $title, $parent, $fileExtension);
+		if ($objectid != 1) $newPath = $newParent->getPath(false, true).DS.$newFileName;
+		else $newPath = realpath($object->getPath(false, true).DS."..".DS).DS.$newFileName;
+
+		if (!$this->objectInfoIsOk($objectid, $title, $parent, $fileExtension)) return false;
+		rename($object->getPath(false, true), $newPath);
+
+		$oldpaththumb = $object->getPath(true, true);
+
+		//Update database
+		$updatableObject = new UpdatableObject($objectid, $parent, $newFileName, $title, $description);
+		$db =& JFactory::getDBO();
+		$db->updateObject('#__helkakg', $updatableObject, 'objectid', false);
+
+		// Move thumbnail
+		if ($object->type == "img") rename($oldpaththumb, $object->getPath(true, true));
+
+		return true;
+	}
+
+	public function swapOrdering($objectid1, $objectid2) {
+		if (!$this->userIsAdmin()) return false;
+
+		// Swaps ordering between two objects
+		$object1 = new HelkaKGObject($objectid1);
+		$object2 = new HelkaKGObject($objectid2);
+		$updatableObject1 = new UpdatableObject($objectid1);
+		$updatableObject2 = new UpdatableObject($objectid2);
+		$updatableObject1->ordering = $object2->ordering;
+		$updatableObject2->ordering = $object1->ordering;
+		$db =& JFactory::getDBO();
+		$db->updateObject('#__helkakg', $updatableObject1, 'objectid', false);
+		$db->updateObject('#__helkakg', $updatableObject2, 'objectid', false);
+		return true;
+	}
+
+	public function orderingLast($objectid) {
+		if (!$this->userIsAdmin()) return false;
+
+		// Sets the ordering of $objectid to the end
+		$object = new HelkaKGObject($objectid);
+		$updatableObject = new UpdatableObject($objectid);
+		$updatableObject->ordering = $this->getNextOrdering();
+		$db =& JFactory::getDBO();
+		$db->updateObject('#__helkakg', $updatableObject, 'objectid', false);
+		return true;
+	}
+	public function orderingFirst($objectid) {
+		if (!$this->userIsAdmin()) return false;
+
+		// Sets the ordering of $objectid to the beginning
+		$object = new HelkaKGObject($objectid);
+		$updatableObject = new UpdatableObject($objectid);
+		$updatableObject->ordering = $this->getSmallestOrdering();
+		$db =& JFactory::getDBO();
+		$db->updateObject('#__helkakg', $updatableObject, 'objectid', false);
+		return true;
+	}
+
+	public function deleteObject($objectid) {
+		if (!$this->userIsAdmin()) return false;
+		if ($objectid == 1) return false;
+
+		//Delete all children first
+		$object = new HelkaKGObject($objectid);
+		foreach($object->getChildren() as $childid) $this->deleteObject($childid);
+
+		//Delete object itself
+		if ($object->type == "img") {
+			if (file_exists($object->getPath(false, true))) unlink($object->getPath(false, true));
+			if (file_exists($object->getPath(true, true))) unlink($object->getPath(true, true));
+		}
+		else if ($object->type == "dir" && file_exists($object->getPath(false, true))) rmdir($object->getPath(false, true));
+
+		//Delete from database
+		$db =& JFactory::getDBO();
+		$query = "DELETE FROM #__helkakg WHERE objectid = ".$objectid.";";
+		$db->setQuery($query);
+		$db->query();
+	}
+
+	// Some helpful functions below...
+
+	public function createThumbnail($objectid) {
+		if (!$this->userIsAdmin()) return false;
+
+		$object = new HelkaKGObject($objectid);
+
+		// Get file extension
+		$extension = strtolower(array_pop(explode(".", $object->fileName)));
+		if ($extension == "jpg" || $extension == "jpeg") $src_image = imagecreatefromjpeg($object->getPath(false, true));
+		elseif ($extension == "png") $src_image = imagecreatefrompng($object->getPath(false, true));
+		elseif ($extension == "gif") $src_image = imagecreatefromgif($object->getPath(false, true));
+		else return false;
+
+		// Calculate thumbnail size
+		list($src_w, $src_h) = getimagesize($object->getPath(false, true));
+		$maxwidth = 128;
+		$maxheight = $maxwidth;
+		$dst_w = $maxwidth;
+		$dst_h = $src_h * ($dst_w / $src_w);
+		if ($dst_h > $maxheight) {
+			$dst_h = $maxheight;
+			$dst_w = $src_w * ($dst_h / $src_h);
+		}
+
+		// Create thumbnail
+		$dst_image = imagecreatetruecolor($dst_w, $dst_h);
+		imagecopyresampled($dst_image, $src_image, 0, 0, 0, 0, $dst_w, $dst_h, $src_w, $src_h);
+
+		if ($extension == "jpg" || $extension == "jpeg") imagejpeg($dst_image, $object->getPath(true, true));
+		elseif ($extension == "png") imagepng($dst_image, $object->getPath(true, true));
+		else imagegif($dst_image, $object->getPath(true, true));
+
+		return true;
+	}
+
+	public function userIsAdmin() {
+		$user =& JFactory::getUser();
+		$groups = $user->get('groups');
+
+		if (empty($groups)) return false;
+		if (max($groups) >= 4) return true;
+
+		return false;
+	}
+
+	public function getNextObjectId() {
+		if (!$this->userIsAdmin()) return false;
+
+		// Returns the next available ID for a new object
+		$db =& JFactory::getDBO();
+		$query = "SELECT objectid FROM #__helkakg ORDER BY objectid DESC LIMIT 1;";
+		$db->setQuery($query);
+		$greatestId = $db->loadResult();
+
+		return $greatestId+1;
+	}
+
+	public function getNextOrdering() {
+		if (!$this->userIsAdmin()) return false;
+
+		// Returns the next available ordering for a new object
+		$db =& JFactory::getDBO();
+		$query = "SELECT ordering FROM #__helkakg ORDER BY ordering DESC LIMIT 1;";
+		$db->setQuery($query);
+		$greatestOrder = $db->loadResult();
+
+		return $greatestOrder+1;
+	}
+	public function getSmallestOrdering() {
+		if (!$this->userIsAdmin()) return false;
+
+		// Returns the smallest ordering available
+		$db =& JFactory::getDBO();
+		$query = "SELECT ordering FROM #__helkakg ORDER BY ordering ASC LIMIT 1;";
+		$db->setQuery($query);
+		$greatestOrder = $db->loadResult();
+
+		return $greatestOrder-1;
+	}
+
+	public function objectIsDir($objectid) {
+		$object = new HelkaKGObject($objectid);
+		return $object->type == "dir";
+	}
+
+	public function objectIsImg($objectid) {
+		$object = new HelkaKGObject($objectid);
+		return $object->type == "img";
+	}
+
+	public function createFileName($objectid, $title, $parent, $fileExtension) {
+		if (!$this->userIsAdmin()) return false;
+
+		$illegalChars = array(DS, " ", "/", "\\", "?", "%", "*", ":", "|", "<", ">", '"', "'", "ä", "Ä", "Ö", "ö");
+		$title = str_replace($illegalChars, "_", $title);
+		$fileName = $parent."_".$objectid."_".$title;
+		if ($fileExtension) $fileName .= ".".$fileExtension;
+		return $fileName;
+	}
+
+	public function objectInfoIsOk($objectid, $title, $parent, $fileExtension) {
+		if (!$this->userIsAdmin()) return false;
+
+		// Checks on update/object creation if object information is ok
+
+		$object = new HelkaKGObject($objectid);
+		$newParent = new HelkaKGObject($parent);
+
+		if ($objectid != 1) $newParent = new HelkaKGObject($parent);
+                else $parent = 0;
+
+                $newFileName = $this->createFileName($objectid, $title, $parent, $fileExtension);
+                if ($objectid != 1) $newPath = $newParent->getPath(false, true).DS.$newFileName;
+                else $newPath = realpath($object->getPath(false, true).DS."..".DS).DS.$newFileName;
+
+		if (file_exists($newPath) && $newPath != $object->getPath(false, true) && $objectid != 1) {
+			$this->errormessage = "Tämän niminen tiedosto on jo olemassa tässä kansiossa.";
+			return false;
+		}
+		if ($title == "" && $fileExtension == "") {
+			$this->errormessage = "Anna kansiolle nimi.";
+			return false;
+		}
+		if (!$this->objectIsDir($parent) && $objectid != 1) {
+			$this->errormessage = "Valitsemasi kansio ei ole olemassa oleva kansio.";
+			return false;
+		}
+		if ($this->folderIsParent($objectid, $parent)) {
+			$this->errormessage = "Et voi siirtää kansiota itsensä alikansioksi.";
+			return false;
+		}
+
+		return true;
+	}
+
+	public function getErrormessage() {
+		return $this->errormessage;
+	}
+
+	public function folderIsParent($objectid, $parentid) {
+		// returns true if $parentid is (grand)^n -parent
+		// of $objectid (n = 0, 1, 2, ...) or $objectid == $parentid
+
+		if ($parentid == 1 or $objectid == 1) return false; //root has no parents
+		if ($objectid == $parentid) return true;
+
+		$parent = new HelkaKGObject($parentid);
+		return $this->folderIsParent($objectid, $parent->parent);
+	}
+
+	public function howManyParents($folderid) {
+		// This function calculates the distance of a folder and the root folder
+		// in the "family tree".
+
+		if ($folderid == 1) return 0; // root has no parents
+
+		$folder = new HelkaKGObject($folderid);
+
+		// a folder has one more parent than its parentfolder
+		return $this->howManyParents($folder->parent)+1;
+	}
+
+	public function log($message) {
+		$logfile = fopen("../logs/logs", "a");
+		fwrite($logfile, date("[d.m.y H:i] ", time()).$message."\n");
+		fclose($logfile);
+	}
+
+}
+
+class HelkaKGObject {
+
+	// All images and folders are objects of this class.
+
+	public $objectid;
+
+	public function __construct($objectid=1) {
+		$this->objectid = $objectid;
+		if ($objectid < 1) $this->objectid = 1;
+	}
+
+	public function __get($name) {
+		$db =& JFactory::getDBO();
+		$query = "SELECT ".$name." FROM #__helkakg WHERE objectid = ".$this->objectid.";";
+		$db->setQuery($query);
+		$value = $db->loadResult();
+
+		return $value;
+	}
+
+	public function getPath($thumbnail = false, $filehandling = false) {
+		// root-folder:
+		if ($this->objectid == 1) {
+			// if getpath is called for move_uploaded_file, unlink, etc. use different path.
+			if ($filehandling) return $_SERVER['DOCUMENT_ROOT'].HELKAKG_PATH."gallery".DS.$this->filename;
+			return HELKAKG_PATH."gallery".DS.$this->filename;
+		}
+		if ($thumbnail) return $this->getParent()->getPath(false, $filehandling).DS."thumbnail_".$this->filename;
+		return $this->getParent()->getPath(false, $filehandling).DS.$this->filename;
+	}
+
+	public function getParent() {
+		if ($this->objectid != 1) return new HelkaKGObject($this->parent);
+	}
+
+	public function getChildren() {
+		$db =& JFactory::getDBO();
+		$query = "SELECT objectid FROM #__helkakg WHERE parent = ".$this->objectid." ORDER BY type DESC, ordering DESC;";
+		$db->setQuery($query);
+		$children = $db->loadRowList();
+
+		$childrenid = array();
+		foreach ($children as $child) array_unshift($childrenid, $child[0]);
+
+		return $childrenid;
+	}
+
+	public function nextObject() {
+		$db =& JFactory::getDBO();
+		$query = "SELECT objectid FROM #__helkakg WHERE parent = ".$this->parent." AND type = '".$this->type."' AND ordering > ".$this->ordering." ORDER BY ordering ASC LIMIT 1;";
+		$db->setQuery($query);
+		$next = $db->loadResult();
+		if ($next) return $next;
+		return false;
+	}
+	public function previousObject() {
+		$db =& JFactory::getDBO();
+		$query = "SELECT objectid FROM #__helkakg WHERE parent = ".$this->parent." AND type = '".$this->type."' AND ordering < ".$this->ordering." ORDER BY ordering DESC LIMIT 1;";
+		$db->setQuery($query);
+		$previous = $db->loadResult();
+		if ($previous) return $previous;
+		return false;
+	}
+}
+
+// This class is for using JDatabase functions
+class UpdatableObject {
+	public $objectid;
+	public $parent;
+	public $fileName;
+	public $title;
+	public $description;
+	public $type;
+	public $ordering;
+
+	public function __construct($objectid, $parent=NULL, $fileName=NULL, $title=NULL, $description=NULL, $type=NULL, $ordering=NULL) {
+		$this->objectid = $objectid;
+		$this->parent = $parent;
+		$this->fileName = $fileName;
+		$this->title = JFilterOutput::cleanText($title);
+		$this->description = JFilterOutput::cleanText($description);
+		if ($type) $this->type = $type;
+		if ($ordering) $this->ordering = $ordering;
+	}
+}
+
+?>

@@ -1,0 +1,27 @@
+.mod_helkakg {
+	width: 500px;
+}
+.mod_helkakg > div {
+	display: inline-block;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+.mod_helkakg_arrow {
+	width: 10px;
+	opacity: 0.3;
+}
+.mod_helkakg_arrow:hover {
+	opacity: 0.5;
+	cursor: hand;
+	cursor: pointer;
+}
+.mod_helkakg_images {
+	max-width: 90%;
+	overflow: hidden;
+}
+.mod_helkakg_image {
+	position: relative;
+}
+.mod_helkakg_image img {
+	vertical-align: top;
+}

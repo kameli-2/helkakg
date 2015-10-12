@@ -1,0 +1,79 @@
+<?php
+// This file is used via AJAX from index.php and its purpose is to use
+// classes HelkaKGGUI and HelkaKGSystem and tell index.php what to write
+// in the document.
+
+//header.php includes joomla libraries
+require(dirname(__FILE__)."/header.php");
+
+require(dirname(__FILE__)."/classes.php");
+
+$helkaKGGUI = new HelkaKGGUI();
+$helkaKGSystem = new HelkaKGSystem();
+
+//GET-variables (for displaying stuff)
+if (isset($_GET['action'])) $action = $_GET['action'];
+elseif (isset($_POST['action'])) $action = $_POST['action'];
+else $helkaKGGUI->displayError("Virhe: toiminto ei määritelty.");
+
+if (isset($_GET['objectid'])) $objectid = $_GET['objectid'];
+elseif (isset($_POST['objectid'])) $objectid = $_POST['objectid'];
+else $objectid = 1;
+
+$helkaKGObject = new HelkaKGObject($objectid);
+
+if (isset($_GET['parentid'])) $parentid = $_GET['parentid'];
+elseif ($objectid != 1) $parentid = $objectid->parent;
+else $parentid = 0;
+
+//POST-variables (for creating/editing stuff)
+if (isset($_POST['helkakg_title'])) $title = $_POST['helkakg_title'];
+else $title = "";
+if (isset($_POST['helkakg_description'])) $description = $_POST['helkakg_description'];
+else $description = "";
+if (isset($_POST['helkakg_parent'])) $parentid = $_POST['helkakg_parent'];
+// no else for parentid, in case it's in a GET-variable.
+if (isset($_POST['helkakg_file'])) $uploadedFile = $_POST['helkakg_file'];
+else $uploadedFile = "";
+
+switch ($action) {
+	// Displaying stuff
+	case "displayObject":
+		$helkaKGGUI->displayObject($objectid);
+		break;
+	case "uploadImage":
+		$helkaKGGUI->displayUploadImage($parentid);
+		break;
+	case "newFolder":
+		$helkaKGGUI->displayNewFolder($parentid);
+		break;
+	case "edit":
+		$helkaKGGUI->displayEditPage($objectid);
+		break;
+	case "delete":
+		if ($object->type == "dir") $message = "Oletko varma, että haluat poistaa kansion ".$object->title."? Kaikki sen sisältämät kansiot ja kuvat poistuvat myös.";
+		else $message = "Oletko varma, että haluat poistaa kuvan ".$object->title."?";
+		$message .= " <a href='#' onclick='deleteHandle(".$objectid.")'>Poista</a> - <a href='#' onclick='displayObject(".$parentid.")'>Peruuta</a>";
+		$helkaKGGUI->displayError($message);
+		break;
+
+	// Editing or creating stuff
+	case "uploadImageHandle":
+		if ($helkaKGSystem->createObject($title, $description, $parentid, $uploadedFile)) $helkaKGGUI->displayObject($parentid);
+		else $helkaKGGUI->displayError($helkaKGSystem->getErrormessage());
+		break;
+	case "newFolderHandle":
+		if ($helkaKGSystem->createObject($title, $description, $parentid)) $helkaKGGUI->displayObject($parentid);
+		else $helkaKGGUI->displayError($helkaKGSystem->getErrormessage());
+		break;
+	case "editHandle":
+		if ($helkaKGSystem->updateObject($objectid, $title, $description, $parentid)) $helkaKGGUI->displayObject($parentid);
+		else $helkaKGGUI->displayError($helkaKGSystem->getErrormessage());
+		break;
+	case "deleteHandle":
+		$helkaKGSystem->deleteObject($objectid);
+		$helkaKGGUI->displayObject($parentid);
+		break;
+}
+
+?>

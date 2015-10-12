@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="module" version="3.1.0" client="site" method="upgrade">
+    <name>Kotikatu Image Gallery Module</name>
+    <author>Zsolt Szilagyi</author>
+    <version>1.0.0</version>
+    <description>A module that displays a snapshot of images in the Kotikatu Image Gallery -component.</description>
+    <files>
+        <filename>mod_helkakg.xml</filename>
+        <filename module="mod_helkakg">mod_helkakg.php</filename>
+        <filename>index.html</filename>
+        <filename>helper.php</filename>
+        <filename>tmpl/default.php</filename>
+        <filename>tmpl/slideshow.php</filename>
+        <filename>tmpl/index.html</filename>
+	<folder>img</folder>
+    </files>
+    <languages>
+	<language tag="en-GB">en-GB.mod_helkakg.ini</language>
+	<language tag="fi-FI">fi-FI.mod_helkakg.ini</language>
+    </languages>
+    <config>
+	<fields name="params">
+	    <fieldset name="basic">
+        	<field
+			name="dir"
+			type="sql"
+			default="1"
+			label="MOD_HELKAKG_CHOOSE_DIR_LABEL"
+			description="MOD_HELKAKG_CHOOSE_DIR_DESC"
+			query="SELECT objectid AS value, title AS dir FROM #__helkakg WHERE type='dir'"
+		/>
+		<field
+			name="subfolders"
+			type="checkbox"
+			label="MOD_HELKAKG_INCLUDE_SUBFOLDERS_LABEL"
+			description="MOD_HELKAKG_INCLUDE_SUBFOLDERS_DESC"
+			default="1"
+		/>
+		<field
+			name="order"
+			type="list"
+			label="MOD_HELKAKG_ORDER_LABEL"
+			description="MOD_HELKAKG_ORDER_DESC"
+			default="time DESC"
+		>
+			<option value="latest">MOD_HELKAKG_LATEST_FIRST</option>
+			<option value="oldest">MOD_HELKAKG_OLDEST_FIRST</option>
+			<option value="ordering">MOD_HELKAKG_FOLDER_ORDER</option>
+			<option value="random">MOD_HELKAKG_RANDOM_ORDER</option>
+		</field>
+		<field
+			name="limit"
+			type="integer"
+			label="MOD_HELKAKG_LIMIT_LABEL"
+			description="MOD_HELKAKG_LIMIT_DESC"
+			default="9"
+			first="1"
+			last="50"
+			step="1"
+		/>
+		<field
+			name="columns"
+			type="integer"
+			label="MOD_HELKAKG_COLUMNS_LABEL"
+			description="MOD_HELKAKG_COLUMNS_DESC"
+			default="3"
+			first="1"
+			last="50"
+			step="1"
+		/>
+		<field
+			name="imgsize"
+			type="text"
+			label="MOD_HELKAKG_IMGSIZE_LABEL"
+			description="MOD_HELKAKG_IMGSIZE_DESC"
+			default="75px"
+		/>
+		<field
+			name="imgmargin"
+			type="text"
+			label="MOD_HELKAKG_IMGMARGIN_LABEL"
+			description="MOD_HELKAKG_IMGMARGIN_DESC"
+			default="0.2em"
+		/>
+                <field
+                        name="shadow"
+                        type="integer"
+                        label="MOD_HELKAKG_SHADOW_LABEL"
+                        description="MOD_HELKAKG_SHADOW_DESC"
+                        default="5"
+			first="0"
+			last="50"
+			step="1"	
+                />
+		<field
+			name="galleryurl"
+			type="menuitem"
+			label="MOD_HELKAKG_GALLERYURL_LABEL"
+			description="MOD_HELKAKG_GALLERYURL_DESC"
+		/>
+		<!--field
+			name="galleryurl"
+			type="text"
+			label="MOD_HELKAKG_GALLERYURL_LABEL"
+			description="MOD_HELKAKG_GALLERYURL_DESC"
+		/-->
+	    </fieldset>
+            <fieldset name="advanced">
+		<field
+		    name="layout"
+		    type="modulelayout"
+		    label="JFIELD_ALT_LAYOUT_LABEL"
+		    description="JFIELD_ALT_MODULE_LAYOUT_DESC"
+		/>
+	    </fieldset>
+	</fields>
+    </config>
+</extension>

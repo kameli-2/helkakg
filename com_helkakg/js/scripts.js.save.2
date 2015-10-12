@@ -1,0 +1,417 @@
+var path = getPath();
+var loadimg = "<img src='"+path+"images/loading.gif' class='helkakg_loadimg'>";
+var ie_fix = new Date().getTime();
+
+$(document).ready(function(){
+
+	/* Create popup-boxes */
+
+	var popupboxhelper = document.createElement("div");
+	popupboxhelper.setAttribute("id", "helkakg_popupboxhelper");
+
+	var imagecontainerhelper = document.createElement("div");
+	imagecontainerhelper.setAttribute("id", "helkakg_imagecontainerhelper");
+
+	var docfrag = document.createDocumentFragment();
+	docfrag.appendChild(imagecontainerhelper);
+	docfrag.appendChild(popupboxhelper);
+	document.body.insertBefore(docfrag, document.body.firstChild);
+
+
+	$("#helkakg_imagecontainerhelper, #helkakg_popupboxhelper").hide();
+	$("#helkakg_imagecontainerhelper").html("<div id='helkakg_imagecontainer'></div><div class='helkakg_shade'></div>");
+	$("#helkakg_popupboxhelper").html("<div id='helkakg_popupbox'></div><div class='helkakg_shade'></div>");
+
+	$("#helkakg_loading").hide();
+	$("#helkakg").load(path+"php/action.php?action=displayObject&iefix="+new Date().getTime());
+
+
+
+
+
+	/* Clicking on a thumbnail */
+
+	$("#helkakg").on("click", ".helkakg_thumbnailpic, .helkakg_bclink", function(){
+		$("#helkakg_loading").show("fast");
+
+		var a = $(this).attr("id").split("_");
+		var fullpath = path+"php/action.php?action=displayObject&objectid="+a[2]+"&iefix="+new Date().getTime();
+		
+		if (a[1] == "dir" || a[1] == "breadcrumbs") {
+			$("#helkakg").hide("fast", function(event){
+				$("#helkakg").load(fullpath,function(responseTxt,statusTxt,xhr){
+					if (statusTxt=="success") {
+						$("#helkakg").show("fast");
+						$("#helkakg_loading").hide("fast");
+					}
+				});
+			});
+		}
+		else if (a[1] == "img") {
+			$("#helkakg_imagecontainer").load(fullpath,function(responseTxt,statusTxt,xhr){
+				if (statusTxt=="success") {
+					$("#helkakg_imagecontainerhelper").show("fast");
+					$("#helkakg_loading").hide("fast");
+				}
+			});
+		
+		}
+	});
+
+
+
+
+
+	/* Closing the "popup"-box */
+
+	$("html").click(function(){
+		$("#helkakg_imagecontainerhelper").hide("fast");
+	});
+	$("#helkakg_imagecontainer").click(function(event){
+		event.stopPropagation();
+	});
+	$("#helkakg_imagecontainer").on("click", ".helkakg_return", function(){
+		$("#helkakg_imagecontainerhelper").hide("fast");
+	});
+
+	$("html").click(function(){
+		$("#helkakg_popupboxhelper").hide("fast");
+	});
+	$("#helkakg_popupbox").click(function(event){
+		event.stopPropagation();
+	});
+	$("#helkakg_popupbox").on("click", ".helkakg_return", function(){
+		$("#helkakg_popupboxhelper").hide("fast");
+	});
+
+
+
+
+
+
+	/* Previous/Next arrow click */
+
+	$("#helkakg_imagecontainer").on("click", ".helkakg_prevnext", function(){
+		var a = $(this).attr("id").split("_");
+		var fullpath = path+"php/action.php?action=displayObject&objectid="+a[2]+"&iefix="+new Date().getTime();
+
+		$("#helkakg_imagecontainer .helkakg_bigimage").fadeOut("fast", function(){
+			$("#helkakg_imagecontainer").load(fullpath, function(responseTxt,statusTxt,xhr){
+				if (statusTxt=="success") {
+					$("#helkakg_imagecontainer .helkakg_bigimage").hide().fadeIn("fast");
+				}
+			});
+		});
+	});
+
+
+
+
+	/* Show/hide thumbnail admin icons on hover */
+
+	$("#helkakg").on("mouseenter", ".helkakg_thumbnail", function(){
+		$(this).find(".helkakg_smallicon").fadeIn("fast");
+	});
+	$("#helkakg").on("mouseleave", ".helkakg_thumbnail", function(){
+		$(this).find(".helkakg_smallicon").fadeOut("fast");
+	});
+
+
+
+
+
+	/* Clicking the thumbnail admin icons */
+
+	$("#helkakg").on("click", ".helkakg_thumbnail .helkakg_smallicon", function(){
+		$("#helkakg_loading").show("fast");
+
+		var a = $(this).attr("id").split("_");
+		var fullpath = path+"php/action.php?action="+a[1]+"&objectid="+a[2]+"&iefix="+new Date().getTime();
+
+		/* No need for popup box in case of order editing */
+		if (a[1] == "editOrdering") {
+			fullpath += "&type="+a[3];
+			$("#helkakg").load(fullpath, $("#helkakg_loading").hide("fast"));
+
+		}
+		/* In other cases - let's pop that box up. */
+		else {
+			$("#helkakg_popupbox").load(fullpath,function(responseTxt,statusTxt,xhr){
+				if (statusTxt=="success") {
+					$("#helkakg_popupboxhelper").show("fast");
+					$("#helkakg_loading").hide("fast");
+				}
+			});
+		}
+	});
+
+
+
+
+
+	/* Confirming/Not confirming delete action */
+
+	$("#helkakg_popupbox").on("click", ".helkakg_error .helkakg_smalliconcontainer", function(){
+		if (!$(this).hasClass("helkakg_cancel")) { /* Delete */
+			$("#helkakg_loading").show("fast");
+
+			var a = $(this).attr("id").split("_");
+			var fullpath = path+"php/action.php?action="+a[1]+"&objectid="+a[2]+"&iefix="+new Date().getTime();
+			$("#helkakg").load(fullpath, $("#helkakg_loading").hide("fast"));
+		}
+		$("#helkakg_popupboxhelper").hide("fast");
+	});
+
+
+
+
+
+
+	/* Sending edit form */
+
+	$("#helkakg_popupbox").on("click", ".helkakg_submit", function(){
+		$("#helkakg_loading").show("fast");
+
+		var a = $(this).attr("id").split("_");
+		var fullpath = path+"php/action.php?iefix="+new Date().getTime();
+		var headers = {
+			"helkakg_title": $("#helkakg_title").val(),
+			"helkakg_description": $("#helkakg_description").val(),
+			"action": a[1]
+		};
+		if (a[1] != "newFolderHandle") headers.objectid = a[2];
+		if (a[2] != 1 || a[1] == "newFolderHandle") headers.helkakg_parent = $("#helkakg_parent").val();
+		$("#helkakg").load(fullpath, headers, $("#helkakg_loading").hide("fast"));
+		$("#helkakg_popupboxhelper").hide("fast");
+	});
+
+
+
+
+
+
+	/* Clicking on admin links in the upper right corner */
+
+	$("html").on("click", ".helkakg_adminlinks .helkakg_smalliconcontainer", function(){
+		$("#helkakg_loading").show("fast");
+
+		var a = $(this).attr("id").split("_");
+		var fullpath = path+"php/action.php?action="+a[1]+"&iefix="+new Date().getTime();
+		if (a.length > 2) {
+			if (a[1] == "newFolder" || a[1] == "uploadImage") fullpath += "&parentid="+a[2];
+			else fullpath += "&objectid="+a[2];
+		}
+
+		if (a[1] == "displayHelp") {
+			$("#helkakg_imagecontainer").load(fullpath,function(responseTxt,statusTxt,xhr){
+				if (statusTxt=="success") {
+					$("#helkakg_imagecontainerhelper").show("fast");
+					$("#helkakg_loading").hide("fast");
+				}
+			});
+		}
+		else {
+			$("#helkakg_popupbox").load(fullpath,function(responseTxt,statusTxt,xhr){
+				if (statusTxt=="success") {
+					$("#helkakg_popupboxhelper").show("fast");
+					$("#helkakg_loading").hide("fast");
+				}
+			});
+
+		}
+	});
+
+
+
+
+
+
+	/* Clicking submit on upload */
+
+	$("#helkakg_popupbox").on("click", "#helkakg_uploader #helkakg_submit", function(){
+		$("#helkakg_uploader #helkakg_submit").attr("disabled", true).val("Ladataan kuvia...");
+		$("#helkakg_loadimgdiv").html(loadimg);
+
+		var fullpath = path+"php/action.php?action=displayObject&objectid="+$("#helkakg_parent").val()+"&iefix="+new Date().getTime();
+
+		$("#helkakg_popupbox").on("load", "#hidden_upload", function(){
+			$("#helkakg").load(fullpath);
+			$("#helkakg_popupboxhelper").hide("fast");
+		});
+	});
+	
+});
+
+/*
+function getXmlHttp() {
+	ie_fix = new Date().getTime(); //update ie_fix
+
+	if (window.XMLHttpRequest) {
+		// code for IE7+, Firefox, Chrome, Opera, Safari
+		return new XMLHttpRequest();
+	}
+	else {
+		// code for IE6, IE5
+		return new ActiveXObject("Microsoft.XMLHTTP");
+	}
+}
+
+function displayObject(objectid) {
+	var xmlhttp = getXmlHttp();
+
+	xmlhttp.onreadystatechange=function() {
+		if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+			document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+		}
+	}
+	var fullpath = path+"php/action.php?action=displayObject";
+	if (objectid !== null) fullpath += "&objectid="+objectid;
+	fullpath += "&iefix="+ie_fix;
+	xmlhttp.open("GET",fullpath,true);
+	xmlhttp.send();
+}
+
+function newFolder(parentid) {
+	var xmlhttp = getXmlHttp();
+
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=newFolder&parentid="+parentid+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function uploadImage(parentid) {
+	var xmlhttp = getXmlHttp();
+
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=uploadImage&parentid="+parentid+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function editObject(objectid) {
+	var xmlhttp = getXmlHttp();
+
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=edit&objectid="+objectid+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function deleteObject(objectid) {
+	var xmlhttp = getXmlHttp();
+
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=delete&objectid="+objectid+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function displayHelp() {
+	var xmlhttp = getXmlHttp();
+
+	xmlhttp.onreadystatechange=function() {
+		if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+			document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+		}
+	}
+	xmlhttp.open("GET",path+"php/action.php?action=displayHelp&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function newFolderHandle() {
+	var helkakg_title = document.getElementById('helkakg_title').value;
+	var helkakg_description = document.getElementById('helkakg_description').value;
+	var helkakg_parent = document.getElementById('helkakg_parent').value;
+
+	document.getElementById("helkakg").innerHTML="Luodaan uutta kansiota... "+loadimg;
+
+	var xmlhttp = getXmlHttp();
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("POST",path+"php/action.php",true);
+	xmlhttp.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+
+	var headers = "helkakg_title="+helkakg_title;
+	headers += "&helkakg_description="+helkakg_description;
+	headers += "&action=newFolderHandle";
+	headers += "&helkakg_parent="+helkakg_parent;
+	xmlhttp.send(headers);
+}
+
+function editHandle(objectid) {
+	var helkakg_title = document.getElementById('helkakg_title').value;
+	var helkakg_description = document.getElementById('helkakg_description').value;
+	if (objectid != 1) var helkakg_parent = document.getElementById('helkakg_parent').value;
+
+	document.getElementById("helkakg").innerHTML="Tallennetaan muokkauksia... "+loadimg;
+
+	var xmlhttp = getXmlHttp();
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+		else document.getElementById("helkakg").innerHTML=xmlhttp.readyState+", "+xmlhttp.status;
+        }
+
+	xmlhttp.open("POST",path+"php/action.php",true);
+	xmlhttp.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+
+	var headers = "helkakg_title="+helkakg_title;
+	headers += "&helkakg_description="+helkakg_description;
+	headers += "&objectid="+objectid;
+	headers += "&action=editHandle";
+	if (objectid != 1) headers += "&helkakg_parent="+helkakg_parent;
+	xmlhttp.send(headers);
+}
+
+function deleteHandle(objectid) {
+	document.getElementById("helkakg").innerHTML="Poistetaan... "+loadimg;
+
+	var xmlhttp = getXmlHttp();
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=deleteHandle&objectid="+objectid+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function editOrdering(objectid, type) {
+	var xmlhttp = getXmlHttp();
+        xmlhttp.onreadystatechange=function() {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+                        document.getElementById("helkakg").innerHTML=xmlhttp.responseText;
+                }
+        }
+	xmlhttp.open("GET",path+"php/action.php?action=editOrdering&objectid="+objectid+"&type="+type+"&iefix="+ie_fix,true);
+	xmlhttp.send();
+}
+
+function uploadImages(parentid) {
+	var hiddeniframe = document.getElementById('hidden_upload');
+
+	if (hiddeniframe.attachEvent) hiddeniframe.attachEvent("onload", displayObject);
+	else if (hiddeniframe.addEventListener) hiddeniframe.addEventListener("load", displayObject, false)
+
+	document.getElementById('helkakg_submit').value="Ladataan kuvia...";
+	document.getElementById('helkakg_submit').disabled=true;
+	document.getElementById('helkakg_loadimgdiv').innerHTML=loadimg;
+}
+*/

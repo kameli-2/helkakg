@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<metadata>
+        <layout title="COM_HELKAKG_HELKAKG_VIEW_DEFAULT_TITLE">
+                <message>
+                        <![CDATA[COM_HELKAKG_HELKAKG_VIEW_DEFAULT_DESC]]>
+                </message>
+        </layout>
+	<fields name="request">
+		<fieldset name="request">
+
+        	        <field
+                	        name="rootdir"
+                        	type="sql"
+	                        default="1"
+        	                label="COM_HELKAKG_CHOOSE_DIR_LABEL"
+                	        description="COM_HELKAKG_CHOOSE_DIR_DESC"
+                        	query="SELECT objectid AS value, title AS rootdir FROM #__helkakg WHERE type='dir'"
+	                />
+        	        <field
+                	        name="subfolders"
+                        	type="radio"
+	                        label="COM_HELKAKG_INCLUDE_SUBFOLDERS_LABEL"
+        	                description="COM_HELKAKG_INCLUDE_SUBFOLDERS_DESC"
+                	        default="1"
+	                >
+				<option value="1">JYES</option>
+				<option value="2">JNO</option>
+			</field>
+        	        <field
+                	        name="listtype"
+                        	type="radio"
+	                        label="COM_HELKAKG_LISTTYPE_LABEL"
+        	                description="COM_HELKAKG_LISTTYPE_DESC"
+                	        default="1"
+	                >
+				<option value="1">COM_HELKAKG_LISTTYPE_NORMAL</option>
+				<option value="2">COM_HELKAKG_LISTTYPE_LIST</option>
+			</field>
+		</fieldset>
+	</fields>
+</metadata>
